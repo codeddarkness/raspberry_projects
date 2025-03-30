@@ -1,0 +1,10 @@
+2. Verify I2C Devices on Both Buses
+Run the following commands to detect devices on both buses:
+
+i2cdetect -y 1  # Check for PCA9685 on bus 1 (GPIO 2, 3)
+i2cdetect -y 4  # Check for MPU6050 on bus 4 (GPIO 23, 24)
+Expected output:
+
+Bus 1 (i2c-1) should detect PCA9685 at 0x40.
+Bus 4 (i2c-4) should detect MPU6050 at 0x68 or 0x69.
+If both show up, then wiring and overlays are correct.

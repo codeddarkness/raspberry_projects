@@ -1,0 +1,46 @@
+1. System Updates & Essentials
+Before installing dependencies, update and upgrade your system:
+
+sudo apt update && sudo apt upgrade -y
+sudo apt install python3-pip python3-venv -y
+2. Python Libraries
+Install the required Python packages:
+
+pip3 install flask smbus pygame adafruit-circuitpython-pca9685 mpu6050-raspberrypi
+Explanation of Dependencies:
+flask → Web framework for the web UI
+smbus → I2C communication with PCA9685 and MPU6050
+pygame → Handles Xbox controller input
+adafruit-circuitpython-pca9685 → Library for controlling PCA9685 servo driver
+mpu6050-raspberrypi → Reads data from the MPU6050 sensor
+3. Enable I2C on Raspberry Pi
+Since you're using I2C devices (PCA9685 and MPU6050), ensure I2C is enabled:
+
+sudo raspi-config
+Navigate to Interface Options → I2C → Enable.
+Then, check if the devices are detected:
+
+sudo i2cdetect -y 1
+You should see addresses 0x40 (PCA9685) and 0x68 (MPU6050).
+
+4. Additional Setup for Xbox Controller (If Needed)
+If using an Xbox controller via USB or Bluetooth:
+
+sudo apt install joystick -y
+sudo modprobe uinput
+sudo chmod 666 /dev/uinput
+For Bluetooth controllers:
+
+sudo apt install bluetooth bluez bluez-tools -y
+To check if your Xbox controller is detected:
+
+jstest /dev/input/js0
+5. Running the Application
+Once everything is installed, navigate to your project directory and run:
+
+python3 servo_controller.py
+Then, open a web browser and go to:
+
+cpp
+http://<your_raspberry_pi_ip>:5000
+

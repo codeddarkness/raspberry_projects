@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Servo Controller</title>
+    <script>
+        const socket = new WebSocket('ws://localhost:8765');
+
+        socket.onopen = function(event) {
+            console.log('WebSocket connection established');
+            socket.send(JSON.stringify({ action: 'get_status' }));
+        };
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log(data); // For debugging
+
+            // Update device status
+            document.getElementById('pca-status').textContent = data.status.pca ? "CONNECTED" : "DISCONNECTED";
+            document.getElementById('mpu-status').textContent = data.status.mpu ? "CONNECTED" : "DISCONNECTED";
+            document.getElementById('controller-status').textContent = data.status.controller ? "CONNECTED" : "DISCONNECTED";
+
+            // Update servos
+            for (let i = 0; i < 4; i++) {
+                document.getElementById(`servo-${i}`).textContent = data.servos[i].position;
+                document.getElementById(`servo-${i}-hold`).checked = data.servos[i].hold;
+            }
+
+            // Update MPU data
+            document.getElementById('mpu-accel').textContent = `Accel: X:${data.mpu.accel.x} Y:${data.mpu.accel.y} Z:${data.mpu.accel.z}`;
+            document.getElementById('mpu-gyro').textContent = `Gyro: X:${data.mpu.gyro.x} Y:${data.mpu.gyro.y} Z:${data.mpu.gyro.z}`;
+            document.getElementById('mpu-temp').textContent = `Temp: ${data.mpu.temp}°C`;
+        };
+
+        function moveServo(channel, angle) {
+            socket.send(JSON.stringify({ servo: { channel: channel, angle: angle } }));
+        }
+
+        function moveAllServos(angle) {
+            socket.send(JSON.stringify({ all: angle }));
+        }
+
+        function toggleHold(channel, checked) {
+            socket.send(JSON.stringify({ hold: { channel: channel, state: checked } }));
+        }
+    </script>
+</head>
+<body>
+    <h1>Servo Controller</h1>
+    <div>
+        <h2>Status</h2>
+        <p>PCA9685: <span id="pca-status">DISCONNECTED</span></p>
+        <p>MPU6050: <span id="mpu-status">DISCONNECTED</span></p>
+        <p>Xbox Controller: <span id="controller-status">DISCONNECTED</span></p>
+        <p>Servo Speed: <span id="servo-speed">1.0</span></p>
+    </div>
+    <div>
+        <h2>Servos</h2>
+        <div>
+            <label for="servo-0">Servo 0: </label>
+            <span id="servo-0">0</span>
+            <button onclick="moveServo(0, 90)">Move to 90°</button>
+            <input type="checkbox" id="servo-0-hold" onchange="toggleHold(0, this.checked)"> Hold
+        </div>
+        <div>
+            <label for="servo-1">Servo 1: </label>
+            <span id="servo-1">0</span>
+            <button onclick="moveServo(1, 90)">Move to 90°</button>
+            <input type="checkbox" id="servo-1-hold" onchange="toggleHold(1, this.checked)"> Hold
+        </div>
+        <div>
+            <label for="servo-2">Servo 2: </label>
+            <span id="servo-2">0</span>
+            <button onclick="moveServo(2, 90)">Move to 90°</button>
+            <input type="checkbox" id="servo-2-hold" onchange="toggleHold(2, this.checked)"> Hold
+        </div>
+        <div>
+            <label for="servo-3">Servo 3: </label>
+            <span id="servo-3">0</span>
+            <button onclick="moveServo(3, 90)">Move to 90°</button>
+            <input type="checkbox" id="servo-3-hold" onchange="toggleHold(3, this.checked)"> Hold
+        </div>
+        <button onclick="moveAllServos(45)">Move All to 45°</button>
+        <button onclick="moveAllServos(90)">Move All to 90°</button>
+        <button onclick="moveAllServos(135)">Move All to 135°</button>
+    </div>
+    <div>
+        <h2>MPU6050 Data</h2>
+        <p id="mpu-accel">Accel: X: 0 Y: 0 Z: 0</p>
+        <p id="mpu-gyro">Gyro: X: 0 Y: 0 Z: 0</p>
+        <p id="mpu-temp">Temp: 0°C</p>
+    </div>
+</body>
+</html>
+

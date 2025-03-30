@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Servo Controller</title>
+    <script>
+        const socket = new WebSocket("ws://localhost:8765");
+
+        socket.onopen = function(event) {
+            console.log("WebSocket connection established.");
+            socket.send(JSON.stringify({ action: "get_status" }));
+        };
+
+        socket.onmessage = function(event) {
+            const data = JSON.parse(event.data);
+            console.log(data);  // For debugging
+
+            // Update device status
+            document.getElementById("pca-status").textContent = data.status.pca ? "CONNECTED" : "DISCONNECTED";
+            document.getElementById("mpu-status").textContent = data.status.mpu ? "CONNECTED" : "DISCONNECTED";
+            document.getElementById("controller-status").textContent = data.status.controller ? "CONNECTED" : "DISCONNECTED";
+
+            // Update servos
+            for (let i = 0; i < 4; i++) {
+                document.getElementById(`servo-${i}`).textContent = data.servos[i].position;
+                document.getElementById(`servo-${i}-hold`).checked = data.servos[i].hold;
+            }
+
+            // Update MPU data
+            document.getElementById("mpu-accel").textContent = `Accel: X:${data.mpu.accel.x} Y:${data.mpu.accel.y} Z:${data.mpu.accel.z}`;
+            document.getElementById("mpu-gyro").textContent = `Gyro: X:${data.mpu.gyro.x} Y:${data.mpu.gyro.y} Z:${data.mpu.gyro.z}`;
+            document.getElementById("mpu-temp").textContent = `Temp: ${data.mpu.temp}`;
+        };
+
+        function moveServo(channel, value) {
+            socket.send(JSON.stringify({ action: "move_servo", channel, value }));
+        }
+
+        function toggleHold(channel) {
+            socket.send(JSON.stringify({ action: "toggle_hold", channel }));
+        }
+    </script>
+</head>
+<body>
+    <h1>Servo Controller</h1>
+
+    <div>
+        <h2>Device Status</h2>
+        <p>PCA9685: <span id="pca-status">DISCONNECTED</span></p>
+        <p>MPU6050: <span id="mpu-status">DISCONNECTED</span></p>
+        <p>Xbox Controller: <span id="controller-status">DISCONNECTED</span></p>
+    </div>
+
+    <div>
+        <h2>Servos</h2>
+        <p>Servo 0: <span id="servo-0">90</span>° <input type="checkbox" id="servo-0-hold" onclick="toggleHold(0)"> Hold</p>
+        <p>Servo 1: <span id="servo-1">90</span>° <input type="checkbox" id="servo-1-hold" onclick="toggleHold(1)"> Hold</p>
+        <p>Servo 2: <span id="servo-2">90</span>° <input type="checkbox" id="servo-2-hold" onclick="toggleHold(2)"> Hold</p>
+        <p>Servo 3: <span id="servo-3">90</span>° <input type="checkbox" id="servo-3-hold" onclick="toggleHold(3)"> Hold</p>
+
+        <input type="range" min="0" max="180" step="1" oninput="moveServo(0, this.value)"> Move Servo 0
+        <input type="range" min="0" max="180" step="1" oninput="moveServo(1, this.value)"> Move Servo 1
+        <input type="range" min="0" max="180" step="1" oninput="moveServo(2, this.value)"> Move Servo 2
+        <input type="range" min="0" max="180" step="1" oninput="moveServo(3, this.value)"> Move Servo 3
+    </div>
+
+    <div>
+        <h2>MPU Data</h2>
+        <p id="mpu-accel">Accel: X: 0 Y: 0 Z: 0</p>
+        <p id="mpu-gyro">Gyro: X: 0 Y: 0 Z: 0</p>
+        <p id="mpu-temp">Temp: 0</p>
+    </div>
+</body>
+</html>
+

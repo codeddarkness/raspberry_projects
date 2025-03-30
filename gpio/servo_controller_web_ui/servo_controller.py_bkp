@@ -1,0 +1,173 @@
+#!/usr/bin/env python3
+import time
+import math
+import board
+import busio
+import adafruit_pca9685
+from mpu6050 import MPU6050
+import inputs
+import xbox
+import logging
+from flask import Flask, render_template, jsonify, request
+import threading
+import json
+import asyncio
+import websockets
+import smbus
+
+
+# Setup logging
+logging.basicConfig(level=logging.INFO)
+
+# Initialize I2C bus and PCA9685
+i2c_bus = busio.I2C(board.SCL, board.SDA)
+pca9685 = adafruit_pca9685.PCA9685(i2c_bus)
+pca9685.frequency = 60
+
+# Setup MPU6050
+mpu = None
+#try:
+#    mpu = MPU6050(i2c_bus)
+#    logging.info("MPU6050 found on I2C bus 1")
+#except Exception as e:
+#    logging.error(f"Failed to initialize MPU6050 on bus 0: {e}")
+
+
+# Initialize MPU6050 with I2C bus 1
+mpu = None
+try:
+    mpu = mpu6050(1)  # Use I2C bus 1 (SMBus(1))
+    logging.info("MPU6050 found on I2C bus 1")
+except Exception as e:
+    logging.error(f"Failed to initialize MPU6050 on bus 1: {e}")
+
+
+# Initialize Xbox controller
+joystick = None
+#try:
+#    joystick = xbox.Xbox360Controller('/dev/input/event3')
+#    logging.info(f"Xbox controller found: {joystick.device}")
+#except Exception as e:
+#    logging.error(f"Controller error: {e}")
+
+import inputs
+
+joystick = None
+try:
+    # List all devices to check which device is being detected
+    devices = inputs.devices
+    joystick = None
+    for device in devices:
+        print(f"Found device: {device.name}")  # Debugging output
+        if 'Xbox' in device.name:  # Check if 'Xbox' is in device name
+            joystick = device
+            break
+
+    if joystick:
+        logging.info(f"Xbox controller found: {joystick.name}")
+    else:
+        logging.error("No Xbox controller found.")
+except Exception as e:
+    logging.error(f"Controller error: {e}")
+
+
+# Set initial servo positions
+servo_positions = {
+    'servo1': 0,
+    'servo2': 0,
+    'servo3': 0
+}
+
+# Function to move servos
+def move_servo(servo_id, position):
+    """Move the servo to a specified position."""
+    servo_channel = int(servo_id[-1]) - 1  # Assuming servo1, servo2, etc.
+    pulse_length = 1000000.0 / 60 / 4096
+    pulse = position * 1000
+    pca9685.channels[servo_channel].duty_cycle = int(pulse)
+
+# Function to get data from MPU6050
+def get_mpu_data():
+    """Retrieve data from the MPU6050 sensor."""
+    if mpu:
+        accel_data = mpu.get_accel_data()
+        gyro_data = mpu.get_gyro_data()
+        return {
+            "accel_x": accel_data['x'],
+            "accel_y": accel_data['y'],
+            "accel_z": accel_data['z'],
+            "gyro_x": gyro_data['x'],
+            "gyro_y": gyro_data['y'],
+            "gyro_z": gyro_data['z']
+        }
+    return {}
+
+# WebSocket handler to send servo and sensor data
+async def handle_websocket(websocket, path):
+    while True:
+        # Send real-time servo and MPU data to web clients
+        data = {
+            'servo_positions': servo_positions,
+            'mpu_data': get_mpu_data()
+        }
+        await websocket.send(json.dumps(data))
+        await asyncio.sleep(0.1)
+
+# Flask app routes
+app = Flask(__name__)
+
+@app.route('/')
+def index():
+    return render_template('servo_controller.html')
+
+@app.route('/get_servo_positions')
+def get_servo_positions():
+    return jsonify(servo_positions)
+
+@app.route('/move_servo', methods=['POST'])
+def api_move_servo():
+    data = request.get_json()
+    servo_id = data['servo_id']
+    position = data['position']
+    move_servo(servo_id, position)
+    servo_positions[servo_id] = position
+    return jsonify(success=True)
+
+@app.route('/get_mpu_data')
+def api_get_mpu_data():
+    return jsonify(get_mpu_data())
+
+async def start_server():
+    # Your server setup here
+    await websockets.serve(handle_websocket, 'localhost', 8765)
+
+# Start the event loop and run the server
+if __name__ == "__main__":
+    try:
+        asyncio.run(start_server())  # This will start the event loop and the server
+    except Exception as e:
+        logging.error(f"Error starting server: {e}")
+
+
+# Function to listen for Xbox controller input in a separate thread
+def listen_for_xbox_input():
+    while True:
+        if joystick:
+            if joystick.is_connected():
+                if joystick.left_trigger():
+                    move_servo('servo1', servo_positions['servo1'] + 5)
+                if joystick.right_trigger():
+                    move_servo('servo2', servo_positions['servo2'] + 5)
+                if joystick.dpad_up():
+                    move_servo('servo3', servo_positions['servo3'] + 5)
+                if joystick.dpad_down():
+                    move_servo('servo3', servo_positions['servo3'] - 5)
+        time.sleep(0.1)
+
+# Start Flask app and WebSocket server
+if __name__ == '__main__':
+    threading.Thread(target=listen_for_xbox_input, daemon=True).start()
+    start_server = websockets.serve(handle_websocket, 'localhost', 8765)
+    asyncio.get_event_loop().run_until_complete(start_server)
+    app.run(debug=True, use_reloader=False)
+

@@ -1,47 +1,30 @@
-#!/usr/bin/env bash
+#!/bin/bash
 
-# Servo_controller_web_ui Setup Script for Raspberry Pi
-# Version 
+# Update and upgrade system
+echo "Updating system..."
+sudo apt update && sudo apt upgrade -y
 
-set -e  # Exit on error
+# Install required system packages
+echo "Installing necessary packages..."
+sudo apt install -y python3-pip python3-venv joystick bluetooth bluez bluez-tools
 
-# Display banner
-echo "=================================================="
-echo "  Servo_controller_web_ui Setup for Raspberry Pi"
-echo "=================================================="
-echo ""
+# Enable I2C
+echo "Enabling I2C..."
+sudo raspi-config nonint do_i2c 0
 
-# Function to display error messages and exit
-error_exit() {
-    echo "ERROR: $1" >&2
-    exit 1
-}
+# Install Python dependencies
+echo "Installing Python dependencies..."
+pip3 install flask smbus pygame adafruit-circuitpython-pca9685 mpu6050-raspberrypi
 
-# Function to check if a package is installed
-is_package_installed() {
-    dpkg -s "$1" >/dev/null 2>&1
-}
+# Configure permissions for Xbox controller support
+echo "Configuring Xbox controller support..."
+sudo modprobe uinput
+sudo chmod 666 /dev/uinput
 
-# Function to install a package if not already installed
-install_package() {
-    if ! is_package_installed "$1"; then
-        echo "Installing $1..."
-        sudo apt install -y "$1" || error_exit "Failed to install $1"
-    else
-        echo "Package $1 is already installed"
-    fi
-}
+# Check for I2C devices
+echo "Checking I2C devices..."
+sudo i2cdetect -y 1
 
-# Update system packages
-echo "Updating system packages..."
-sudo apt update
-sudo apt upgrade -y
+# Display completion message
+echo "Setup complete. You can now run python3 servo_controller.py"
 
-# Install required packages
-echo "Installing dependencies..."
-# Add your required packages here
-# install_package "package-name"
-
-# Your setup code here
-
-echo "Servo_controller_web_ui setup completed!"
