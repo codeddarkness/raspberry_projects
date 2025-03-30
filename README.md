@@ -3,6 +3,7 @@
 A collection of useful scripts and tools for Raspberry Pi projects.
 
 ## Categories
+* [PlayStation Controller Setup](controllers/ps_controller_setup/README.md): Scripts for PS3 and PS4 controllers
 
 - **Controllers**: Scripts for setting up game controllers
 - **Networking**: Network configuration scripts
