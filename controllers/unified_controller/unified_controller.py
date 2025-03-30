@@ -6,6 +6,8 @@ import signal
 import sys
 import time
 import argparse
+import os
+import subprocess
 from evdev import InputDevice, ecodes
 
 # Try to import Adafruit_PCA9685, but allow the script to run in debug mode without it
@@ -28,7 +30,10 @@ lock_state = False
 servo_positions = {0: 90, 1: 90, 2: 90, 3: 90}
 servo_speed = 1.0
 controller_type = None
+connection_type = "Unknown"
 pwm = None
+sixaxis_values = {"tilt_x": 0, "tilt_y": 0, "tilt_z": 0, "accel_x": 0, "accel_y": 0, "accel_z": 0}
+last_activity = time.time()
 
 def initialize_hardware():
     """Initialize the PCA9685 hardware if available"""
@@ -52,8 +57,17 @@ def joystick_to_pwm(value):
     pwm_value = int(SERVO_MIN + (angle / SERVO_RANGE) * (SERVO_MAX - SERVO_MIN))
     return pwm_value, angle
 
+def accelerometer_to_pwm(value, center=0, range=512):
+    """Convert accelerometer value to PWM pulse and angle"""
+    # Normalize accelerometer values to 0-180 degrees
+    normalized = max(0, min(SERVO_RANGE, ((value - center + range/2) / range) * SERVO_RANGE))
+    angle = int(normalized)
+    pwm_value = int(SERVO_MIN + (angle / SERVO_RANGE) * (SERVO_MAX - SERVO_MIN))
+    return pwm_value, angle
+
 def move_servo(channel, value):
     """Move a servo to the position based on joystick value"""
+    global last_activity
     if lock_state or hold_state[channel]:
         return  # Don't move if locked or held
     
@@ -61,10 +75,25 @@ def move_servo(channel, value):
     if PWM_AVAILABLE and pwm:
         pwm.set_pwm(channel, 0, pwm_value)
     servo_positions[channel] = angle
+    last_activity = time.time()
+    display_status()
+
+def move_servo_accel(channel, value, center=0, range=512):
+    """Move a servo based on accelerometer/gyro value"""
+    global last_activity
+    if lock_state or hold_state[channel]:
+        return  # Don't move if locked or held
+    
+    pwm_value, angle = accelerometer_to_pwm(value, center, range)
+    if PWM_AVAILABLE and pwm:
+        pwm.set_pwm(channel, 0, pwm_value)
+    servo_positions[channel] = angle
+    last_activity = time.time()
     display_status()
 
 def move_all_servos(angle):
     """Move all servos to a specified angle"""
+    global last_activity
     if lock_state:
         return  # Don't move if locked
         
@@ -73,7 +102,35 @@ def move_all_servos(angle):
         if PWM_AVAILABLE and pwm:
             pwm.set_pwm(channel, 0, pwm_value)
         servo_positions[channel] = angle
+    last_activity = time.time()
     display_status()
+
+def detect_connection_type(device_path):
+    """Determine if the controller is connected via USB, Bluetooth or SixAxis"""
+    if 'event' in device_path:
+        # Check if it's a USB connection
+        if os.path.exists("/sys/class/input/" + device_path.split('/')[-1] + "/device/driver/module"):
+            module = os.readlink("/sys/class/input/" + device_path.split('/')[-1] + "/device/driver/module")
+            if "hid" in module:
+                return "USB"
+        
+        # Check if it's a Bluetooth connection
+        try:
+            bluetooth_devices = subprocess.check_output(["hcitool", "con"], universal_newlines=True)
+            if bluetooth_devices and len(bluetooth_devices.strip().split('\n')) > 1:
+                return "Bluetooth"
+        except:
+            pass
+        
+        # Check if sixad is running
+        try:
+            ps_output = subprocess.check_output(["ps", "-ef"], universal_newlines=True)
+            if "sixad" in ps_output:
+                return "SixAxis"
+        except:
+            pass
+    
+    return "Unknown"
 
 def display_status():
     """Display status of joysticks, angles, and hold buttons matching original format"""
@@ -93,16 +150,44 @@ def display_status():
     hold_status = {ch: "ON" if hold_state[ch] else "OFF" for ch in hold_state}
     lock_indicator = "LOCKED" if lock_state else "UNLOCKED"
     
-    # Print status line in original format
-    print(f"\rLX:{lx} {servo_positions[0]:3}° LY:{ly} {servo_positions[1]:3}° RY:{ry} {servo_positions[2]:3}° RX:{rx} {servo_positions[3]:3}° | "
-          f"Hold - A:{hold_status[0]} B:{hold_status[1]} X:{hold_status[2]} Y:{hold_status[3]} "
-          f"Lock:{lock_indicator} Spd:{servo_speed:.1f}x", end="")
+    # Print status line
+    status_line = f"\rLX:{lx} {servo_positions[0]:3}° LY:{ly} {servo_positions[1]:3}° RY:{ry} {servo_positions[2]:3}° RX:{rx} {servo_positions[3]:3}° | "
+    
+    # Add controller-specific status
+    if controller_type == "PS3":
+        status_line += f"Hold - ■:{hold_status[0]} ○:{hold_status[1]} ✕:{hold_status[2]} △:{hold_status[3]} "
+        # Add SixAxis info if available
+        status_line += f"| Tilt:{sixaxis_values['tilt_x']:4},{sixaxis_values['tilt_y']:4},{sixaxis_values['tilt_z']:4} "
+    else:  # Xbox or Generic
+        status_line += f"Hold - A:{hold_status[0]} B:{hold_status[1]} X:{hold_status[2]} Y:{hold_status[3]} "
+    
+    # Add lock status, speed and connection type
+    status_line += f"| {lock_indicator} Spd:{servo_speed:.1f}x [{connection_type}]"
+    
+    print(status_line, end="")
 
-def find_controller():
+def find_controller(device_path=None):
     """Find and return a PlayStation or Xbox controller device"""
+    if device_path:
+        try:
+            device = InputDevice(device_path)
+            # Detect controller type from name
+            if 'PLAYSTATION' in device.name or 'PlayStation' in device.name:
+                return device, 'PS3' if '3' in device.name else 'PS'
+            elif 'Xbox' in device.name:
+                return device, 'Xbox'
+            else:
+                return device, 'Generic'
+        except (FileNotFoundError, PermissionError):
+            print(f"Could not access device at {device_path}")
+            return None, None
+    
+    # No specific path, try to auto-detect
     devices = [InputDevice(path) for path in evdev.list_devices()]
     for device in devices:
-        if 'PLAYSTATION' in device.name or 'PlayStation' in device.name:
+        if 'PLAYSTATION(R)3' in device.name or 'PlayStation 3' in device.name:
+            return device, 'PS3'
+        elif 'PLAYSTATION' in device.name or 'PlayStation' in device.name:
             return device, 'PS'
         elif 'Xbox' in device.name:
             return device, 'Xbox'
@@ -141,48 +226,132 @@ def run_csv_mode(csv_file="servo_angles.csv"):
 
 def run_controller_mode(device_path=None):
     """Run using a PlayStation or Xbox controller"""
-    global controller_type, lock_state, servo_speed
+    global controller_type, lock_state, servo_speed, connection_type, sixaxis_values
     
     try:
-        # Try to use specified device path if provided
-        if device_path:
-            gamepad = evdev.InputDevice(device_path)
-            # Detect controller type from name
-            if 'PLAYSTATION' in gamepad.name or 'PlayStation' in gamepad.name:
-                controller_type = 'PS'
-            elif 'Xbox' in gamepad.name:
-                controller_type = 'Xbox'
-            else:
-                controller_type = 'Generic'
-        else:
-            # Auto-detect controller
-            gamepad, controller_type = find_controller()
-            if not gamepad:
-                print("No PlayStation or Xbox controller found. Available devices:")
-                for path in evdev.list_devices():
+        # Try to use specified device path or auto-detect controller
+        gamepad, controller_type = find_controller(device_path)
+        if not gamepad:
+            print("No PlayStation or Xbox controller found. Available devices:")
+            for path in evdev.list_devices():
+                try:
                     dev = evdev.InputDevice(path)
                     print(f"  {path}: {dev.name}")
-                return
+                except:
+                    pass
+            return
+        
+        # Determine connection type
+        connection_type = detect_connection_type(gamepad.path)
         
         print(f"Using {gamepad.name} ({controller_type}) at {gamepad.path}")
-        print("Use joysticks to control servos. ABXY buttons toggle hold. Press Ctrl+C to exit.")
+        print(f"Connection type: {connection_type}")
+        print("Use joysticks to control servos. Press buttons to toggle hold. Press Ctrl+C to exit.")
+        
+        # Get capabilities to check for SixAxis support
+        caps = gamepad.capabilities()
+        has_sixaxis = ecodes.EV_ABS in caps and (
+            ecodes.ABS_RZ in caps[ecodes.EV_ABS] or 
+            ecodes.ABS_Z in caps[ecodes.EV_ABS] or
+            ecodes.ABS_TILT_X in caps.get(ecodes.EV_ABS, []) or
+            ecodes.ABS_TILT_Y in caps.get(ecodes.EV_ABS, [])
+        )
+        
+        if controller_type == 'PS3' and has_sixaxis:
+            print("SixAxis motion detection enabled!")
+        
+        # PS3 button mapping dictionary
+        ps3_button_map = {
+            304: ecodes.BTN_EAST,   # Circle -> B
+            305: ecodes.BTN_SOUTH,  # Cross -> A
+            307: ecodes.BTN_NORTH,  # Triangle -> Y
+            308: ecodes.BTN_WEST,   # Square -> X
+            310: ecodes.BTN_TL,     # L1 -> Left Trigger
+            311: ecodes.BTN_TR,     # R1 -> Right Trigger
+            312: ecodes.BTN_SELECT, # Select -> Select/Back
+            313: ecodes.BTN_START,  # Start -> Start/Options
+            316: ecodes.BTN_MODE,   # PS Button -> Guide/Home
+        }
+        
+        # PS3 D-pad mapping dictionary
+        ps3_dpad_map = {
+            544: {0: ecodes.BTN_DPAD_UP},     # Up
+            544: {1: ecodes.BTN_DPAD_RIGHT},  # Right
+            544: {2: ecodes.BTN_DPAD_DOWN},   # Down
+            544: {4: ecodes.BTN_DPAD_LEFT},   # Left
+        }
         
         # Main event loop
         for event in gamepad.read_loop():
+            # Map PS3 buttons to standard buttons if needed
+            if controller_type == 'PS3' and event.type == ecodes.EV_KEY:
+                if event.code in ps3_button_map:
+                    event.code = ps3_button_map[event.code]
+            
+            # Handle PS3 D-pad (which uses ABS events instead of KEY)
+            if controller_type == 'PS3' and event.type == ecodes.EV_ABS and event.code == 16:  # Hat0X
+                if event.value == -1:  # D-pad left
+                    move_all_servos(0)
+                elif event.value == 1:  # D-pad right
+                    move_all_servos(180)
+            
+            if controller_type == 'PS3' and event.type == ecodes.EV_ABS and event.code == 17:  # Hat0Y
+                if event.value == -1:  # D-pad up
+                    move_all_servos(90)
+                elif event.value == 1:  # D-pad down
+                    lock_state = not lock_state
+                    status = "locked" if lock_state else "unlocked"
+                    print(f"\nServos are now {status}.")
+                    display_status()
+            
             # Handle joystick movements
             if event.type == ecodes.EV_ABS:
                 if event.code == ecodes.ABS_X:  # Left Stick X → Servo 0
                     move_servo(0, event.value)
                 elif event.code == ecodes.ABS_Y:  # Left Stick Y → Servo 1
                     move_servo(1, event.value)
-                elif event.code == ecodes.ABS_RY:  # Right Stick Y → Servo 2
-                    move_servo(2, event.value)
-                elif event.code == ecodes.ABS_RX:  # Right Stick X → Servo 3
-                    move_servo(3, event.value)
+                
+                # Handle different controller mappings for right stick
+                if controller_type == 'PS3':
+                    if event.code == 3:  # Right Stick X → Servo 2
+                        move_servo(2, event.value)
+                    elif event.code == 4:  # Right Stick Y → Servo 3
+                        move_servo(3, event.value)
+                else:  # Xbox
+                    if event.code == ecodes.ABS_RY:  # Right Stick Y → Servo 2
+                        move_servo(2, event.value)
+                    elif event.code == ecodes.ABS_RX:  # Right Stick X → Servo 3
+                        move_servo(3, event.value)
+                
+                # Handle SixAxis motions for PS3 controllers
+                if controller_type == 'PS3':
+                    # Map sensor inputs to the sixaxis_values dictionary
+                    if event.code == ecodes.ABS_RZ:  # Accelerometer X
+                        sixaxis_values['accel_x'] = event.value
+                        if time.time() - last_activity > 1:  # Only use motion if no joystick activity
+                            move_servo_accel(0, event.value, 128, 128)
+                    elif event.code == ecodes.ABS_Z:  # Accelerometer Y
+                        sixaxis_values['accel_y'] = event.value
+                        if time.time() - last_activity > 1:
+                            move_servo_accel(1, event.value, 128, 128)
+                    elif event.code == 24:  # Accelerometer Z
+                        sixaxis_values['accel_z'] = event.value
+                    elif event.code == 25:  # Gyro/Tilt X
+                        sixaxis_values['tilt_x'] = event.value
+                        if time.time() - last_activity > 1:
+                            move_servo_accel(2, event.value, 128, 128)
+                    elif event.code == 26:  # Gyro/Tilt Y
+                        sixaxis_values['tilt_y'] = event.value
+                        if time.time() - last_activity > 1:
+                            move_servo_accel(3, event.value, 128, 128)
+                    elif event.code == 27:  # Gyro/Tilt Z
+                        sixaxis_values['tilt_z'] = event.value
+                    
+                    if has_sixaxis:
+                        display_status()  # Update display to show motion sensor values
             
             # Handle button presses
             elif event.type == ecodes.EV_KEY and event.value == 1:  # Button down
-                # Handle different button codes for PlayStation and Xbox
                 if event.code == ecodes.BTN_SOUTH:  # A/Cross button → Hold Servo 1
                     hold_state[1] = not hold_state[1]
                     display_status()
@@ -211,34 +380,52 @@ def run_controller_mode(device_path=None):
                     servo_speed = max(servo_speed - 0.1, 0.1)
                     print(f"\nSpeed decreased to {servo_speed:.1f}x")
                     display_status()
-                elif event.code in (ecodes.BTN_DPAD_RIGHT, ecodes.KEY_RIGHT):  # Right D-pad → 180°
-                    move_all_servos(180)
-                elif event.code in (ecodes.BTN_DPAD_LEFT, ecodes.KEY_LEFT):  # Left D-pad → 0°
-                    move_all_servos(0)
-                elif event.code in (ecodes.BTN_DPAD_UP, ecodes.KEY_UP):  # Up D-pad → 90°
-                    move_all_servos(90)
-                elif event.code in (ecodes.BTN_DPAD_DOWN, ecodes.KEY_DOWN):  # Down D-pad → Toggle lock
-                    lock_state = not lock_state
-                    status = "locked" if lock_state else "unlocked"
-                    print(f"\nServos are now {status}.")
-                    display_status()
+                
+                # Handle D-pad for Xbox and generic controllers
+                # (PS3 D-pad is handled above in the EV_ABS section)
+                if controller_type != 'PS3':
+                    if event.code == ecodes.BTN_DPAD_RIGHT:  # Right D-pad → 180°
+                        move_all_servos(180)
+                    elif event.code == ecodes.BTN_DPAD_LEFT:  # Left D-pad → 0°
+                        move_all_servos(0)
+                    elif event.code == ecodes.BTN_DPAD_UP:  # Up D-pad → 90°
+                        move_all_servos(90)
+                    elif event.code == ecodes.BTN_DPAD_DOWN:  # Down D-pad → Toggle lock
+                        lock_state = not lock_state
+                        status = "locked" if lock_state else "unlocked"
+                        print(f"\nServos are now {status}.")
+                        display_status()
     
     except FileNotFoundError:
         print(f"Error: Could not find controller. Make sure it's connected.")
     except PermissionError:
         print(f"Permission denied. Try running with sudo.")
     except Exception as e:
+        import traceback
         print(f"Error: {e}")
+        traceback.print_exc()
 
 def main():
     parser = argparse.ArgumentParser(description='Unified Controller for PlayStation and Xbox controllers')
     parser.add_argument('--device', help='Path to input device (e.g., /dev/input/event3)')
     parser.add_argument('--csv', help='Path to CSV file with servo angles')
     parser.add_argument('--debug', action='store_true', help='Run in debug mode without servo control')
+    parser.add_argument('--list', action='store_true', help='List available input devices')
     args = parser.parse_args()
 
     # Register signal handler for Ctrl+C
     signal.signal(signal.SIGINT, exit_handler)
+    
+    # List available devices if requested
+    if args.list:
+        print("Available input devices:")
+        for path in evdev.list_devices():
+            try:
+                dev = evdev.InputDevice(path)
+                print(f"  {path}: {dev.name}")
+            except:
+                pass
+        return
     
     # Initialize hardware unless in debug mode
     if not args.debug and not initialize_hardware():
