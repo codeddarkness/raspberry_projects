@@ -10,6 +10,7 @@ A collection of useful scripts and tools for Raspberry Pi projects.
 - **Media**: Media center and multimedia scripts
 - **System**: System configuration and optimization scripts
 - **GPIO**: Scripts for GPIO pin control and hardware interaction
+* [Servo_controller_web_ui](gpio/servo_controller_web_ui/README.md): web ui for 4 servo system with controller
 
 ## Installation
 
