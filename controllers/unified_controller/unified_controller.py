@@ -76,7 +76,7 @@ def move_all_servos(angle):
     display_status()
 
 def display_status():
-    """Display status of joysticks, angles, and hold buttons in a compact single line"""
+    """Display status of joysticks, angles, and hold buttons matching original format"""
     arrows = {
         "left": "←", "right": "→",
         "up": "↑", "down": "↓",
@@ -89,12 +89,14 @@ def display_status():
     ry = arrows["up"] if servo_positions[2] < 90 else arrows["down"] if servo_positions[2] > 90 else arrows["neutral"]
     rx = arrows["left"] if servo_positions[3] < 90 else arrows["right"] if servo_positions[3] > 90 else arrows["neutral"]
 
-    # Get hold status
-    hold_indicators = "".join(["H" if hold_state[ch] else "." for ch in range(4)])
-    lock_indicator = "L" if lock_state else "."
+    # Get hold status for each button (matching original format)
+    hold_status = {ch: "ON" if hold_state[ch] else "OFF" for ch in hold_state}
+    lock_indicator = "LOCKED" if lock_state else "UNLOCKED"
     
-    # Print compact status line
-    print(f"\rLX:{lx}{servo_positions[0]:3}° LY:{ly}{servo_positions[1]:3}° RY:{ry}{servo_positions[2]:3}° RX:{rx}{servo_positions[3]:3}° | Hold:{hold_indicators} Lock:{lock_indicator} Spd:{servo_speed:.1f}x", end="")
+    # Print status line in original format
+    print(f"\rLX:{lx} {servo_positions[0]:3}° LY:{ly} {servo_positions[1]:3}° RY:{ry} {servo_positions[2]:3}° RX:{rx} {servo_positions[3]:3}° | "
+          f"Hold - A:{hold_status[0]} B:{hold_status[1]} X:{hold_status[2]} Y:{hold_status[3]} "
+          f"Lock:{lock_indicator} Spd:{servo_speed:.1f}x", end="")
 
 def find_controller():
     """Find and return a PlayStation or Xbox controller device"""
