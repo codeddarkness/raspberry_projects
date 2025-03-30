@@ -1,0 +1,19 @@
+# Compiled files
+*.o
+*.so
+*.pyc
+__pycache__/
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# User-specific files
+config.user.json
+.env
