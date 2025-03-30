@@ -155,7 +155,7 @@ def display_status():
     
     # Add controller-specific status
     if controller_type == "PS3":
-        status_line += f"Hold - ■:{hold_status[0]} ○:{hold_status[1]} ✕:{hold_status[2]} △:{hold_status[3]} "
+        status_line += f"Hold - ✕:{hold_status[0]} ○:{hold_status[1]} □:{hold_status[2]} △:{hold_status[3]} "
         # Add SixAxis info if available
         status_line += f"| Tilt:{sixaxis_values['tilt_x']:4},{sixaxis_values['tilt_y']:4},{sixaxis_values['tilt_z']:4} "
     else:  # Xbox or Generic
@@ -260,26 +260,17 @@ def run_controller_mode(device_path=None):
         if controller_type == 'PS3' and has_sixaxis:
             print("SixAxis motion detection enabled!")
         
-        # PS3 button mapping dictionary
-        ps3_button_map = {
-            304: ecodes.BTN_EAST,   # Circle -> B
-            305: ecodes.BTN_SOUTH,  # Cross -> A
-            307: ecodes.BTN_NORTH,  # Triangle -> Y
-            308: ecodes.BTN_WEST,   # Square -> X
-            310: ecodes.BTN_TL,     # L1 -> Left Trigger
-            311: ecodes.BTN_TR,     # R1 -> Right Trigger
-            312: ecodes.BTN_SELECT, # Select -> Select/Back
-            313: ecodes.BTN_START,  # Start -> Start/Options
-            316: ecodes.BTN_MODE,   # PS Button -> Guide/Home
-        }
+        # Show capabilities for debugging
+        print("Controller capabilities:", end=" ")
+        if ecodes.EV_ABS in caps:
+            abs_caps = caps[ecodes.EV_ABS]
+            print(f"Analog axes: {len(abs_caps)}", end=" ")
+            
+        if ecodes.EV_KEY in caps:
+            key_caps = caps[ecodes.EV_KEY]
+            print(f"Buttons: {len(key_caps)}", end=" ")
         
-        # PS3 D-pad mapping dictionary
-        ps3_dpad_map = {
-            544: {0: ecodes.BTN_DPAD_UP},     # Up
-            544: {1: ecodes.BTN_DPAD_RIGHT},  # Right
-            544: {2: ecodes.BTN_DPAD_DOWN},   # Down
-            544: {4: ecodes.BTN_DPAD_LEFT},   # Left
-        }
+        print("") # End the line
         
         # Main event loop
         for event in gamepad.read_loop():
@@ -325,43 +316,43 @@ def run_controller_mode(device_path=None):
                 
                 # Handle SixAxis motions for PS3 controllers
                 if controller_type == 'PS3':
-                    # Map sensor inputs to the sixaxis_values dictionary
-                    if event.code == ecodes.ABS_RZ:  # Accelerometer X
+                    # Map sensor inputs to the sixaxis_values dictionary based on observed event codes
+                    if event.code == 18:  # Accelerometer X
                         sixaxis_values['accel_x'] = event.value
                         if time.time() - last_activity > 1:  # Only use motion if no joystick activity
                             move_servo_accel(0, event.value, 128, 128)
-                    elif event.code == ecodes.ABS_Z:  # Accelerometer Y
+                    elif event.code == 19:  # Accelerometer Y
                         sixaxis_values['accel_y'] = event.value
                         if time.time() - last_activity > 1:
                             move_servo_accel(1, event.value, 128, 128)
-                    elif event.code == 24:  # Accelerometer Z
+                    elif event.code == 20:  # Accelerometer Z
                         sixaxis_values['accel_z'] = event.value
-                    elif event.code == 25:  # Gyro/Tilt X
+                    elif event.code == 23:  # Gyro/Tilt X
                         sixaxis_values['tilt_x'] = event.value
                         if time.time() - last_activity > 1:
                             move_servo_accel(2, event.value, 128, 128)
-                    elif event.code == 26:  # Gyro/Tilt Y
+                    elif event.code == 24:  # Gyro/Tilt Y
                         sixaxis_values['tilt_y'] = event.value
                         if time.time() - last_activity > 1:
                             move_servo_accel(3, event.value, 128, 128)
-                    elif event.code == 27:  # Gyro/Tilt Z
+                    elif event.code == 25:  # Gyro/Tilt Z
                         sixaxis_values['tilt_z'] = event.value
                     
                     if has_sixaxis:
                         display_status()  # Update display to show motion sensor values
             
-            # Handle button presses
-            elif event.type == ecodes.EV_KEY and event.value == 1:  # Button down
-                if event.code == ecodes.BTN_SOUTH:  # A/Cross button → Hold Servo 1
-                    hold_state[1] = not hold_state[1]
-                    display_status()
-                elif event.code == ecodes.BTN_EAST:  # B/Circle button → Hold Servo 0
+            # Handle button presses for Xbox controllers (PS3 controllers are handled in a PS3-specific section above)
+            elif event.type == ecodes.EV_KEY and event.value == 1 and controller_type != 'PS3':  # Button down
+                if event.code == ecodes.BTN_SOUTH:  # A button → Hold Servo 0
                     hold_state[0] = not hold_state[0]
                     display_status()
-                elif event.code == ecodes.BTN_NORTH:  # Y/Triangle button → Hold Servo 2
+                elif event.code == ecodes.BTN_EAST:  # B button → Hold Servo 1
+                    hold_state[1] = not hold_state[1]
+                    display_status()
+                elif event.code == ecodes.BTN_WEST:  # X button → Hold Servo 2
                     hold_state[2] = not hold_state[2]
                     display_status()
-                elif event.code == ecodes.BTN_WEST:  # X/Square button → Hold Servo 3
+                elif event.code == ecodes.BTN_NORTH:  # Y button → Hold Servo 3
                     hold_state[3] = not hold_state[3]
                     display_status()
                 elif event.code == ecodes.BTN_SELECT:  # Select/Share button → Calibration
@@ -383,18 +374,17 @@ def run_controller_mode(device_path=None):
                 
                 # Handle D-pad for Xbox and generic controllers
                 # (PS3 D-pad is handled above in the EV_ABS section)
-                if controller_type != 'PS3':
-                    if event.code == ecodes.BTN_DPAD_RIGHT:  # Right D-pad → 180°
-                        move_all_servos(180)
-                    elif event.code == ecodes.BTN_DPAD_LEFT:  # Left D-pad → 0°
-                        move_all_servos(0)
-                    elif event.code == ecodes.BTN_DPAD_UP:  # Up D-pad → 90°
-                        move_all_servos(90)
-                    elif event.code == ecodes.BTN_DPAD_DOWN:  # Down D-pad → Toggle lock
-                        lock_state = not lock_state
-                        status = "locked" if lock_state else "unlocked"
-                        print(f"\nServos are now {status}.")
-                        display_status()
+                if event.code == ecodes.BTN_DPAD_RIGHT:  # Right D-pad → 180°
+                    move_all_servos(180)
+                elif event.code == ecodes.BTN_DPAD_LEFT:  # Left D-pad → 0°
+                    move_all_servos(0)
+                elif event.code == ecodes.BTN_DPAD_UP:  # Up D-pad → 90°
+                    move_all_servos(90)
+                elif event.code == ecodes.BTN_DPAD_DOWN:  # Down D-pad → Toggle lock
+                    lock_state = not lock_state
+                    status = "locked" if lock_state else "unlocked"
+                    print(f"\nServos are now {status}.")
+                    display_status()
     
     except FileNotFoundError:
         print(f"Error: Could not find controller. Make sure it's connected.")
@@ -439,3 +429,4 @@ def main():
 
 if __name__ == "__main__":
     main()
+
