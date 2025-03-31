@@ -295,13 +295,21 @@ def run_controller_mode(device_path=None):
                 # D-pad for PS3 via hat0x/hat0y
                 elif event.code == 16:  # D-pad X axis
                     if event.value == -1:  # D-pad left
-                        move_all_servos(0)
+                        # Left button decreases speed
+                        servo_speed = max(servo_speed - 0.1, 0.1)
+                        print(f"\nSpeed decreased to {servo_speed:.1f}x")
+                        display_status()
                     elif event.value == 1:  # D-pad right
-                        move_all_servos(180)
+                        # Right button increases speed
+                        servo_speed = min(servo_speed + 0.1, 2.0)
+                        print(f"\nSpeed increased to {servo_speed:.1f}x")
+                        display_status()
                 elif event.code == 17:  # D-pad Y axis
                     if event.value == -1:  # D-pad up
+                        # Up button sends servos to 90 degrees (center)
                         move_all_servos(90)
                     elif event.value == 1:  # D-pad down
+                        # Down button toggles servo lock
                         lock_state = not lock_state
                         status = "locked" if lock_state else "unlocked"
                         print(f"\nServos are now {status}.")
@@ -372,6 +380,10 @@ def run_controller_mode(device_path=None):
                         servo_speed = min(servo_speed + 0.1, 2.0)
                         print(f"\nSpeed increased to {servo_speed:.1f}x")
                         display_status()
+                    elif event.code == 298:  # L2 - Move all servos to 0°
+                        move_all_servos(0)
+                    elif event.code == 299:  # R2 - Move all servos to 180°
+                        move_all_servos(180)
                 # Handle Xbox and other controllers
                 else:
                     if event.code == ecodes.BTN_SOUTH:  # A button → Hold Servo 0
@@ -460,4 +472,5 @@ def main():
 
 if __name__ == "__main__":
     main()
+
 
