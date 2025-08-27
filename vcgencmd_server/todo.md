@@ -14,7 +14,7 @@ Uptime CPU Load Memory Load Avg
 
 #2# verify the uptime, cpu, memory and load stats are showing up/active, currently shows nothing
 
-
 #3# warning should only appear when user attempts to go over system defaults/thresolds
 ⚠️ Overclocking can damage your Pi. Ensure adequate cooling.
 
+#4# add the system stats data to the results file /snapshots for historical comparison of system activity to temps/clock/voltage/throttled data
