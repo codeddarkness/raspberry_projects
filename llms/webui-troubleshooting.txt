@@ -1,0 +1,31 @@
+Open WebUI Troubleshooting Guide
+================================
+
+If you experience connection issues:
+
+1. Check container status:
+   sudo docker ps -f name=open-webui
+
+2. Check container logs:
+   sudo docker logs open-webui
+
+3. Verify Ollama is running:
+   curl http://localhost:11434/api/tags
+
+4. Try network host mode if standard setup fails:
+   sudo docker stop open-webui
+   sudo docker rm open-webui
+   sudo docker run -d --network=host -v open-webui:/app/backend/data -e OLLAMA_BASE_URL=http://127.0.0.1:11434 --name open-webui --restart always ghcr.io/open-webui/open-webui:main
+   # Then access at http://localhost:8080
+
+5. Reset data volume if needed:
+   sudo docker volume rm open-webui
+
+6. Check firewall settings if accessing remotely
+
+Common Issues:
+- "Server Connection Error": Try network host mode
+- Slow responses: Models may be loading or Pi is under load
+- Can't see models: Check Ollama connection in Settings > General
+
+Web Interface: http://localhost:3000

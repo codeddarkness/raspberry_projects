@@ -1,0 +1,8 @@
+Usage examples:
+  ollama run gemma2:2b
+  ollama run qwen2.5:3b
+  ollama run nemotron-mini:4b
+
+To test a model, try:
+  ollama run gemma2:2b 'Generate a Docker Compose file for WordPress with MySQL database'
+

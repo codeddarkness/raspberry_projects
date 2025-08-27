@@ -1,0 +1,34 @@
+Open WebUI Network Access Guide
+===============================
+
+Your Open WebUI is accessible at:
+  Local (Pi only):     http://localhost:3000  
+  Network (all devices): http://10.0.0.195:3000
+
+Network Access Checklist:
+□ Container is running: docker ps | grep open-webui
+□ Port is accessible: netstat -ln | grep :3000
+□ Firewall allows access: sudo ufw status
+□ Devices on same network as Pi (10.0.0.195)
+
+Troubleshooting Network Access:
+1. Test from Pi: curl http://localhost:3000
+2. Check container: docker logs open-webui
+3. Check port binding: docker port open-webui
+4. Test from other device: ping 10.0.0.195
+
+Security Notes:
+- First user becomes admin
+- Consider setting strong passwords
+- Monitor access logs if needed
+- Use HTTPS in production environments
+
+Router Configuration (if needed):
+- Port forwarding for external access
+- Static IP assignment for Pi
+- DMZ settings (not recommended)
+
+Commands:
+- Check IP: hostname -I
+- Test connectivity: nc -zv 10.0.0.195 3000
+- Restart container: docker restart open-webui
