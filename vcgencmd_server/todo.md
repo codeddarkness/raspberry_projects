@@ -18,3 +18,7 @@ Uptime CPU Load Memory Load Avg
 ⚠️ Overclocking can damage your Pi. Ensure adequate cooling.
 
 #4# add the system stats data to the results file /snapshots for historical comparison of system activity to temps/clock/voltage/throttled data
+
+#5# unable to apply the overclock settings
+2025-08-27 06:05:07 - Applying overclock: CPU=2200MHz, GPU=700MHz, Voltage=0μV
+2025-08-27 06:05:07 - Error applying overclock settings: [Errno 13] Permission denied: '/boot/firmware/config.txt.tmp'
