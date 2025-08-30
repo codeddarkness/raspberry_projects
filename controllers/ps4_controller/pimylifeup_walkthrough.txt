@@ -1,0 +1,166 @@
+Setting up a PlayStation 4 Controller On the Raspberry Pi
+There are a few different ways you can utilize your PlayStation 4 controller with your Raspberry Pi. Some of these are simpler to deal with than others.
+
+Sony USB Wireless Adapter
+The Sony USB Wireless Adapter is probably the easiest solution to getting your PS4 controller paired with the Raspberry Pi. Especially since the dongle should be able to work out of the box and pair with any official PS4 Controllers.
+
+Bluetooth
+Bluetooth is a bit more complicated than just using the official Sony USB Wireless adapter and requires you to have a Raspberry Pi 3, Raspberry Pi Zero W, or a USB Bluetooth adapter.
+
+
+However, this method does not work correctly for every PS4 controller, and you may have to end up utilizing a userspace controller driver called ds4drv to be able to interact with it.
+
+Please note that if you previously set up the SIXAD tool, you will have to uninstall it to use your PS4 controller with the Raspberry Pi.
+
+USB Cable
+Using a USB Cable is the easiest way to utilize your PS4 Controller, just plug it in with a Micro USB cable like you would when first connecting your controller to the PS4 itself.
+
+Using the USB connection, the PS4 controller should just work straight off the bat.
+
+Pairing your PS4 Controller via BluetoothCTL
+Please note that if you previously followed our guide on connecting a PS3 controller to your Raspberry Pi via Bluetooth, you will have to follow the next couple of steps. Otherwise, skip to step 2 of this section.
+
+1. The reason for having to remove SIXAD is that it seems to conflict with the PlayStation 4 controllers and does not allow them to pair and function correctly.
+
+
+To uninstall the sixad package that we compiled and installed in our PS3 section we need to just run the following command on the Raspberry Pi.
+
+sudo dpkg -r sixad
+Copy
+2. Now before we get to set up everything lets make sure our Raspberry Pi is entirely up to date by running the following two commands on it.
+
+sudo apt update
+sudo apt upgrade
+Copy
+3. Now let’s begin the process of pairing our PS4 controller with our Raspberry Pi. For this guide, we will be using the Bluetooth command line tool.
+
+Run the following command on your Raspberry Pi to start it up.
+
+sudo bluetoothctl
+Copy
+4. With the bluetoothctl tool now up we need to run the following two commands in it, this we enable the agent and set the agent to the default.
+
+
+agent on
+default-agent
+Copy
+5. Now that we have enabled the agent we can finally start scanning for devices. Switching scan on is crucial as it will show up our controller when we tell it to start syncing.
+
+scan on
+Copy
+6. Now is the time to press both your “Share” button and PS button on your controller at the same time like shown in the diagram below. Hold these till the light on your controller starts flashing.
+
+PS3 Controller Upper Right and Middle Button
+
+7. You should see something like below appear on your command line, once you see this, make a note of the MAC address.
+
+The MAC address is the hexadecimal number separated by the ‘:‘ symbol.
+
+[NEW] Device 00:01:6C:B4:06:7E Wireless Controller
+Copy
+In this case, the MAC Address is “00:01:6C:B4:06:7E“.
+
+8. While your controller is still flashing, type in the following command. Make sure that you replace “YOUR_MAC_ADDRESS” with the MAC address that you got in Step 8. This command makes a connection with your PS4 controller.
+
+
+If your controller stops flashing just press the “Share” and “PS” buttons again.
+
+connect YOUR_MAC_ADDRESS
+Copy
+9. Upon a successful connection, you should see the following appear in your command line.
+
+Attempting to connect to 00:01:6C:B4:06:7E
+[CHG] Device 00:01:6C:B4:06:7E Connected: yes
+[CHG] Device 00:01:6C:B4:06:7E UUIDs: 00001124-0000-1000-8000-00805f9b34fb
+[CHG] Device 00:01:6C:B4:06:7E UUIDs: 00001200-0000-1000-8000-00805f9b34fb
+[CHG] Device 00:01:6C:B4:06:7E ServicesResolved: yes
+[CHG] Device 00:01:6C:B4:06:7E Paired: yes
+Connection successful
+Copy
+
+10. Now we need to add our MAC address to the trusted list so the PS4 controller can automatically connect to the Raspberry Pi.
+
+trust YOUR_MAC_ADDRESS
+Copy
+11. With the PS4 controller now trusted by the Raspberry Pi’s Bluetooth device, we can now quit out of the tool by pressing CTRL + D or typing in “quit“.
+
+We can now proceed on to testing whether the controller is working.
+
+12. Let’s now install the joystick package, while this comes with some installations of Raspbian we will run the install command just in case. This package includes the applications we need to be able to test whether our controller is working correctly.
+
+Run the following Linux command on your Raspberry Pi to install the software.
+
+sudo apt install joystick
+Copy
+13. With the joystick package now installed to your Raspberry Pi you can now run the following command, this will test js0 and receive the values back from it.
+
+
+
+
+sudo jstest /dev/input/js0
+Copy
+14. Now if values change when you move and press buttons on your controller, then you are ready to go with your PS4 controller, and you can finish the tutorial here.
+
+However, if your controller refuses to work, you may have to try the alternative way and utilize the userspace driver, follow our guide in the next section below.
+
+Using ds4driv to connect the PS4 Controller to the Raspberry Pi
+Only utilize this option if standard Bluetooth doesn’t work at all. This method makes use of a userspace driver that talks with the controller and allow it to be understood by the Raspberry Pi.
+
+You will need to of already paired your PS4 controller with your Raspberry Pi before you can continue with the following steps.
+
+1. To begin, we need to install the packages we require for ds4drv. To install the necessary python3 components run the following command on your Raspberry Pi.
+
+
+sudo apt install python3-dev python3-pip
+Copy
+2. With the required python packages now installed to the Raspberry Pi, we can use pip to grab ds4drv and the python libraries necessary for it. Run the following command to use pip3 to install it.
+
+sudo pip3 install ds4drv
+Copy
+3. Lets now setup the Raspberry Pi so non-root users can gain access to the joystick device that ds4drv creates, to do this run the following three commands on your Raspberry Pi. These commands download the ruleset then applies them.
+
+sudo wget https://raw.githubusercontent.com/chrippa/ds4drv/master/udev/50-ds4drv.rules -O /etc/udev/rules.d/50-ds4drv.rules
+sudo udevadm control --reload-rules
+sudo udevadm trigger
+Copy
+4. Now while your PlayStation 4 controller is still paired to the Raspberry Pi, we can run the following command to see if ds4drv can read and interact with your controller.
+
+
+sudo ds4drv --hidraw --led 000008
+Copy
+5. Once you see text like below appear on your command line, that means that ds4drv can see and talk with your PS4 controller that is paired with the Raspberry Pi.
+
+[info][controller 1] Connected to Bluetooth Controller (00:01:6C:B4:06:7E hidraw5)
+[info][hidraw] Scanning for devices
+[info][controller 1] Battery: Fully charged
+Copy
+Now quit out of ds4drv by pressing CTRL + C.
+
+6. We need to modify the bootup script now, so it automatically launches ds4drv at startup. To begin doing this run the following command on the Raspberry Pi.
+
+sudo nano /etc/rc.local
+Copy
+7. Now we need to add the following line to this file. This line will launch ds4drv when the Raspberry Pi boots up.
+
+
+Find
+
+exit 0
+Copy
+Add Above
+
+/usr/local/bin/ds4drv --hidraw --led 000008 &
+Copy
+Once you have made the changes, you can save the file by pressing CTRL + X then Y then hitting ENTER.
+
+8. You can now restart the Raspberry Pi to test whether it is starting up correctly. Do this by running the following command.
+
+sudo reboot
+Copy
+9. Once your Raspberry Pi has rebooted, you can now use the following command to test whether everything is working. If the numbers change then everything is working as it should.
+
+
+sudo jstest /dev/input/js0
+Copy
+Conclusions
+

@@ -1,0 +1,37 @@
+Installation
+Blueman
+Blueman interface let’s you search, trust and apply various settings. Use following command to install Blueman
+
+$ sudo apt install blueman
+Jstest
+We will need this package to test whether the controller is working after it connects, so a good idea to install it.
+
+$ sudo apt install jstest-gtk
+Before Connection
+You may want to restart your Pi. You can also reset your PS4 controller by using a toothpick and pressing the reset button for around 5 to 10 seconds (I suggest doing this, if you had consistent failure before this setup). If you had situation where it connects and immediately disconnects make sure you have enough battery. You can use following command or a tool called upower (details in referenced gentoo article) to check the battery level.
+
+cat "/sys/class/power_supply/sony_controller_battery_04:76:6e:9a:98:fc/capacity"
+The device id will be according to your controller (you can hit tab after power_supply/ to autocomplete). You can run upower or above cat command while PS4 controller is connected via usb.
+
+Connecting PS4 controller via bluetooth.
+Start Blueman (command line blueman-manager)
+Make sure to start bluetooth (Turn Bluetooth On) using the system panel icon for Blueman.
+Either use Setup New Device or Devices menu option (using the system panel icon)
+Both options will let you go to search for new devices (in the first option go to next menu). In Devices use Search button.
+If your DualShock controller is connected through USB, disconnect it. Make sure any other devices that previously connected to your PS4 controller is turned off. In case your PS4 is only turned off and the power plugs are not removed from wall, PS4 controller could connect to PS4 instead of the computer.
+Press and hold PS + Share button for 6 to 7 seconds. This part is very important. There is a difference between PS4 blinking and blinking for trying to pair. When it is trying to pair (and discoverable mode) it will blink fast. Make sure you hold the PS + Share button until it blinks rapidly.
+It should list as Wireless Controller in Blueman’s Devices list. You should see something like following diagram. If you PS4 controller turns off before discovery, repeat previous step.
+
+Right click Wireless Controller and select Pair and Trust. If the controller disconnected at this time, it should be fine, otherwise your PS4 controller color should turn from glowing White to Blue.
+
+To connect the device to the computer press the PS button. Don’t go to pairing mode again. In previous step if you were only able to Trust but not Pair, when you press the PS button after disconnecting it will blink (but slowly), press Setup. That should complete rest of the setup process.
+
+To connect the controller with the computer every time you have to make sure bluetooth is on, and in the controller press PS button (only PS button). The light should turn to solid blue. To turn off the controller you can disconnect from Devices menu or hold PS button until it turns off the light. You can also right click in the Devices window and select Connect To/Disconnect Human Interface Device or use this option from Recent Connections in Blueman taskbar icon. Some time the UI will show Input/Output error but the controller will still connect.
+
+Once connected the interface will change to something like this.
+
+Now you can open up jstest-gtk app and you should see the controller listed. You should be able to go to properties and move the controller button.
+
+
+
+
