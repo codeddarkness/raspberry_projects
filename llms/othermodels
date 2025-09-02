@@ -1,0 +1,8 @@
+tinyllama:latest
+llava:latest
+llama3:latest
+deepseek-r1:8b
+deepseek-r1:1.5b
+nemotron-mini:4b
+qwen2.5:3b
+gemma2:2b
