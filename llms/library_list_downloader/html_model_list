@@ -1,0 +1,1 @@
+grep -A5 '\*' ollama_model_library.html | head -n881 | sed 's/\*/#/g' | sed 's/$/,/g' | tr '\n' ' ' | tr '#' '\n' | sort -u
